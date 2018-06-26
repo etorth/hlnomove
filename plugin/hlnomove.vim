@@ -1,8 +1,26 @@
 " to support search-and-no-move
 " use space key to highlight pattern under the cursor
 let g:word_under_cursor_hightlighting_list = []
-function! CreateSearchMultiWordRegexp()
+function! ResetHighlightWordUnderCursorBySearchWord(search_word)
     call uniq(sort(g:word_under_cursor_hightlighting_list))
+
+    if empty(a:search_word)
+        return
+    endif
+
+    for index in range(0, len(g:word_under_cursor_hightlighting_list) - 1)
+        if g:word_under_cursor_hightlighting_list[index] == a:search_word
+            call remove(g:word_under_cursor_hightlighting_list, index)
+            return
+        endif
+    endfor
+
+    call add(g:word_under_cursor_hightlighting_list, a:search_word)
+endfunction
+
+function! BuildHightlightWordUnderCursorRegexp()
+    call uniq(sort(g:word_under_cursor_hightlighting_list))
+
     if empty(g:word_under_cursor_hightlighting_list)
         return ''
     endif
@@ -14,33 +32,19 @@ function! CreateSearchMultiWordRegexp()
     return l:search_regexp
 endfunction
 
-function! ResetSearchMutliWordListOption()
-    let @/ = CreateSearchMultiWordRegexp()
-    silent set hlsearch
-endfunction
-
-function! ResetSearchMutliWordList()
-    " @/ is not g:word_under_cursor_hightlighting_list
-    " means user has searched something else, need to clean the list
-    if @/ != CreateSearchMultiWordRegexp()
+function! ToggleHighlightWordUnderCursor()
+    if @/ != BuildHightlightWordUnderCursorRegexp()
         let g:word_under_cursor_hightlighting_list = []
     endif
 
-    " if current word is in the list
-    " we double checked the word to un-highlight it
-    let l:search_word = expand('<cword>')
-    call uniq(sort(g:word_under_cursor_hightlighting_list))
-    for index in range(0, len(g:word_under_cursor_hightlighting_list) - 1)
-        if g:word_under_cursor_hightlighting_list[index] == l:search_word
-            call remove(g:word_under_cursor_hightlighting_list, index)
-            call ResetSearchMutliWordListOption()
-            return
-        endif
-    endfor
+    call ResetHighlightWordUnderCursorBySearchWord(expand('<cword>'))
+    let l:search_regexp = BuildHightlightWordUnderCursorRegexp()
 
-    " not in the list
-    " add a new word to the list
-    call add(g:word_under_cursor_hightlighting_list, l:search_word)
-    call ResetSearchMutliWordListOption()
+    let @/ = l:search_regexp
+    if empty(l:search_regexp)
+        return ":silent nohlsearch\<CR>"
+    else
+        return ":silent set hlsearch\<CR>"
+    endif
 endfunction
-nnoremap <silent> <SPACE> :call ResetSearchMutliWordList()<CR>
+nnoremap <silent> <expr> <space> ToggleHighlightWordUnderCursor()
